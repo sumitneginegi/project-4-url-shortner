@@ -28,9 +28,8 @@ module.exports = {
     getUrl : async (req, res) => {
         try{
             let urlCode = req.params.urlCode
-            if(urlCode == ":urlCode") return res.status(400).send({status: false, message: "please enter urlCode in Params"})
 
-            if (!urlCode) return res.status(400).send({status: false,message: "please enter url"})
+            //if (!urlCode) return res.status(400).send({status: false,message: "please enter url"})
             if (!shortid.isValid(urlCode) || urlCode.length != 9) return res.status(400).send({status: false,message: "please enter valid url"})
 
             let findUrl = await urlModel.findOne({urlCode:urlCode}).select({longUrl:1,_id:0})
