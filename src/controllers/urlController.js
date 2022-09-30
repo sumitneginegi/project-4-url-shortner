@@ -19,6 +19,9 @@ module.exports = {
             if (findUrl) return res.status(400).send({status:false,message:"longUrl is already present"})
 
             let urlCode = shortid.generate().toLowerCase()
+            if (findUrl) {
+                urlCode = urlCode+shortid.generate()
+            }
             let shortUrl = `http://localhost:3000/${urlCode}`
             let data = {longUrl,shortUrl:shortUrl,urlCode:urlCode}
 
@@ -34,7 +37,7 @@ module.exports = {
             let urlCode = req.params.urlCode
 
             //if (!urlCode) return res.status(400).send({status: false,message: "please enter url"})
-            if (urlCode.length != 9) return res.status(400).send({status: false,message: "url code should be 9 character only"})
+           if (urlCode.length % 9 !=0) return res.status(400).send({status: false,message: "url code should be 9 or multiple of 9 characters only"})
             if (!shortid.isValid(urlCode)) return res.status(400).send({status: false,message: "please enter valid url"})
             
             let findUrl = await urlModel.findOne({urlCode:urlCode}).select({longUrl:1,_id:0})
