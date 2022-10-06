@@ -22,8 +22,9 @@ const redisClient = redis.createClient(
     
     //Connection setup for redis
     
-    const SET_ASYNC = promisify(redisClient.SET).bind(redisClient);
+    const SETEX_ASYNC = promisify(redisClient.SETEX).bind(redisClient);
     const GET_ASYNC = promisify(redisClient.GET).bind(redisClient);
+    const SET_ASYNC=promisify(redisClient.SET).bind(redisClient)
 
 const isValidAdd = function (value) {
     if (typeof value == "undefined" || value === null || typeof value === "boolean" || typeof value === "number") return false
@@ -41,29 +42,35 @@ const creatUrl = async function (req, res) {
             return res.status(400).send({ status: false, message: "please provide data in body" })
         }
         if (!longUrl) {
-            return res.status(400).send({ status: false, message: "Url is mandatory" })
+            return res.status(400).send({ status: false, message: "please input longUrl is mandatory" })
         }
 
         if (!validUrl.isUri(longUrl)) {
             return res.status(400).send({ status: false, message: "invalid long URL" })
         }
-        const urlCode = shortid.generate().toLowerCase()
-        //Locale
-        let url = await UrlModel.findOne({ longUrl }).select({ _id: 0, createdAt: 0, updatedAt: 0, __v: 0 })
-        console.log(url)
+    
+        
+        let casheData = await GET_ASYNC(`${longUrl}`);
+        if(casheData) return res.status(200).send({status:false,msg:" data from cache",data: JSON.parse(casheData)})
+
+
+        let url = await UrlModel.findOne({ longUrl }).select({ longUrl: 1, shortUrl: 1, urlCode: 1, _id: 0 })
         if (url) {
-            return res.status(200).send({ status: true,msg:"Data from db", data: url })
+            await SETEX_ASYNC(`${longUrl}`,60,JSON.stringify({longUrl}))        // setting in cache
+            return res.status(200).send({ status: true,msg:"Data from db", data: url})
         }
 
+        const urlCode = shortid.generate().toLowerCase()
         const shortUrl = baseUrl + '/' + urlCode
 
         url = new UrlModel({ longUrl, shortUrl, urlCode })
         await url.save()
-        let obj = await UrlModel.findOne({ longUrl }).select({ _id: 0, createdAt: 0, updatedAt: 0, __v: 0 })
-        res.status(200).send({ status: true,msg:"data newly created", data: obj })
+        let obj = await UrlModel.findOne({ longUrl }).select({ _id: 0, __v: 0 })
+        //await SETEX_ASYNC(`${longUrl}`, 20, JSON.stringify(longUrl))  
+        return res.status(201).send({ status: true,msg:"data newly created", data: obj })
 
     } catch (err) {
-        res.status(500).send({ status: false, message: err })
+         return res.status(500).send({ status: false, message: err })
     }
 }
 
@@ -74,17 +81,19 @@ const getUrl = async function (req, res) {
 
         if (casheData) return res.status(302).redirect(casheData);
     
-        const findURL = await UrlModel.findOne({ urlCode: req.params.urlCode });
-
+        const findURL = await UrlModel.findOne({ urlCode: req.params.urlCode }) .select({_id:0,__v:0});
+       
+        console.log(findURL)
         if(findURL){
-      //  await SET_ASYNC(`${req.params.urlCode}`, findURL.longUrl);
-      await SET_ASYNC(`${req.params.urlCode}`, findURL.longUrl,'EX',60);// likho
+     
+        await SET_ASYNC(`${req.params.urlCode}`, findURL.longUrl,'EX',60);
         return res.status(302).redirect(findURL.longUrl);
+       
         }
         
         return res.status(404).send({ status: false, message: "url not found" })
 
-    }
+}
     catch (err) {
         res.status(500).send({ status: false, message: err })
     }
